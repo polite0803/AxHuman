@@ -1149,6 +1149,11 @@ impl Provider for ReliableProvider {
                         }
                         Some(Err(ref e)) => {
                             let non_retryable = is_stream_error_non_retryable(e);
+                            let session_expired = matches!(
+                                e,
+                                super::traits::StreamError::Provider(message)
+                                    if crate::core::observability::is_session_expired_message(message)
+                            );
 
                             tracing::warn!(
                                 provider = provider_name,
@@ -1157,6 +1162,17 @@ impl Provider for ReliableProvider {
                                 error = %e,
                                 "Streaming failed{}", if non_retryable { " (non-retryable)" } else { "" }
                             );
+
+                            // Session-expired is a terminal auth condition. Surface
+                            // it to the consumer immediately and stop — retrying or
+                            // falling back to other providers cannot recover an
+                            // expired session and only wastes attempts.
+                            if session_expired {
+                                let _ = tx
+                                    .send(Err(super::traits::StreamError::Provider(e.to_string())))
+                                    .await;
+                                return;
+                            }
 
                             if non_retryable || attempts >= max_retries {
                                 break; // Move to next candidate

@@ -411,6 +411,12 @@ jobs:
           cache-on-failure: true
           shared-key: pr-rust-core-cov
 
+      - name: Free disk space
+        run: |
+          rm -rf target/debug target/release target/llvm-cov-target || true
+          rm -rf /tmp/* || true
+          df -h . || true
+
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 

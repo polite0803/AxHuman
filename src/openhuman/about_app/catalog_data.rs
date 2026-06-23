@@ -1449,6 +1449,93 @@ pub(super) const CAPABILITIES: &[Capability] = &[
         status: CapabilityStatus::Beta,
         privacy: LOCAL_CREDENTIALS,
     },
+    // ── Boost VC capability foundations ─────────────────────────────────────
+    Capability {
+        id: "voice_assistant.session",
+        name: "Voice Assistant Sessions",
+        domain: "voice_assistant",
+        category: CapabilityCategory::Automation,
+        description: "Core/RPC voice session foundation with open STT/TTS adapters, transcript \
+                      handoff, and session status controls.",
+        how_to: "Start a voice session via RPC: openhuman.voice_assistant_start_session.",
+        status: CapabilityStatus::Beta,
+        privacy: Some(CapabilityPrivacy {
+            leaves_device: true,
+            data_kind: PrivacyDataKind::UserContent,
+            destinations: &["OpenHuman backend", "TinyHumans Neocortex"],
+        }),
+    },
+    Capability {
+        id: "guided_flows.recommendation",
+        name: "Guided Recommendation Flows",
+        domain: "guided_flows",
+        category: CapabilityCategory::Automation,
+        description: "Core/RPC quiz and recommendation flow engine with structured answers, \
+                      reusable flow definitions, and recommendation output.",
+        how_to: "Start a flow via RPC: openhuman.guided_flows_start_flow with flow_id.",
+        status: CapabilityStatus::Beta,
+        privacy: None,
+    },
+    Capability {
+        id: "live_captions.transcript",
+        name: "Live Caption Transcripts",
+        domain: "live_captions",
+        category: CapabilityCategory::Automation,
+        description: "Core/RPC transcript pipeline for caption segments, saved transcripts, \
+                      summaries, and meeting-note handoff.",
+        how_to: "Start via RPC: openhuman.live_captions_start_transcript with source.",
+        status: CapabilityStatus::Beta,
+        privacy: Some(CapabilityPrivacy {
+            leaves_device: true,
+            data_kind: PrivacyDataKind::UserContent,
+            destinations: &["OpenHuman backend", "TinyHumans Neocortex"],
+        }),
+    },
+    Capability {
+        id: "voice_actions.intent",
+        name: "Voice Action Recognition",
+        domain: "voice_actions",
+        category: CapabilityCategory::Automation,
+        description: "Core/RPC voice-command recognizer that maps utterances to controller-backed \
+                      or skill-backed actions with visible status metadata for app callers.",
+        how_to: "Recognize via RPC: openhuman.voice_actions_recognize with utterance.",
+        status: CapabilityStatus::Beta,
+        privacy: Some(CapabilityPrivacy {
+            leaves_device: true,
+            data_kind: PrivacyDataKind::UserContent,
+            destinations: &["OpenHuman backend", "TinyHumans Neocortex"],
+        }),
+    },
+    Capability {
+        id: "operator_inbox.triage",
+        name: "Operator Inbox Triage",
+        domain: "operator_inbox",
+        category: CapabilityCategory::Automation,
+        description: "Core/RPC operator inbox foundation with IMAP fetching, SMTP reply sending, \
+                      message triage, contextual draft replies, and follow-up scheduling.",
+        how_to: "Triage via RPC: openhuman.operator_inbox_triage_message with sender/subject/body; fetch via openhuman.operator_inbox_fetch_inbox.",
+        status: CapabilityStatus::Beta,
+        privacy: Some(CapabilityPrivacy {
+            leaves_device: true,
+            data_kind: PrivacyDataKind::UserContent,
+            destinations: &["OpenHuman backend", "TinyHumans Neocortex"],
+        }),
+    },
+    Capability {
+        id: "chat_with_data.query",
+        name: "Chat-with-Data Analytics",
+        domain: "chat_with_data",
+        category: CapabilityCategory::Automation,
+        description: "Core/RPC natural-language analytics over registered datasets with \
+                      SQL validation, anomaly detection, trend analysis, and summaries.",
+        how_to: "Query via RPC: openhuman.chat_with_data_query with dataset_id and question.",
+        status: CapabilityStatus::Beta,
+        privacy: Some(CapabilityPrivacy {
+            leaves_device: true,
+            data_kind: PrivacyDataKind::UserContent,
+            destinations: &["OpenHuman backend", "TinyHumans Neocortex"],
+        }),
+    },
     // ── Update ──────────────────────────────────────────────────────────────
     // ── Meet ────────────────────────────────────────────────────────────────
     Capability {

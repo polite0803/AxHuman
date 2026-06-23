@@ -293,6 +293,21 @@ fn build_registered_controllers() -> Vec<RegisteredController> {
     controllers.extend(
         crate::openhuman::desktop_companion::all_desktop_companion_registered_controllers(),
     );
+    // Standalone voice assistant: local STT/TTS conversational loop.
+    controllers
+        .extend(crate::openhuman::voice_assistant::all_voice_assistant_registered_controllers());
+    // Guided recommendation flows: quiz-style intake and recommendation engine.
+    controllers.extend(crate::openhuman::guided_flows::all_guided_flows_registered_controllers());
+    // Live captions: real-time transcription, transcript storage, and summarization.
+    controllers.extend(crate::openhuman::live_captions::all_live_captions_registered_controllers());
+    // Voice actions: intent recognition and controller-backed action execution.
+    controllers.extend(crate::openhuman::voice_actions::all_voice_actions_registered_controllers());
+    // Operator inbox: message triage, draft generation, and follow-up scheduling.
+    controllers
+        .extend(crate::openhuman::operator_inbox::all_operator_inbox_registered_controllers());
+    // Chat-with-data: NL querying over datasets and proactive insight generation.
+    controllers
+        .extend(crate::openhuman::chat_with_data::all_chat_with_data_registered_controllers());
     // Structured WhatsApp Web data — agent-facing read-only controllers (list/search).
     // The write-path ingest controller is registered separately in build_internal_only_controllers.
     controllers.extend(crate::openhuman::whatsapp_data::all_whatsapp_data_registered_controllers());
@@ -448,6 +463,18 @@ fn build_declared_controller_schemas() -> Vec<ControllerSchema> {
     schemas.extend(crate::openhuman::whatsapp_data::all_whatsapp_data_controller_schemas());
     // Mobile device pairing and management
     schemas.extend(crate::openhuman::devices::all_devices_controller_schemas());
+    // Standalone voice assistant
+    schemas.extend(crate::openhuman::voice_assistant::all_voice_assistant_controller_schemas());
+    // Guided recommendation flows
+    schemas.extend(crate::openhuman::guided_flows::all_guided_flows_controller_schemas());
+    // Live captions and transcripts
+    schemas.extend(crate::openhuman::live_captions::all_live_captions_controller_schemas());
+    // Voice-driven actions
+    schemas.extend(crate::openhuman::voice_actions::all_voice_actions_controller_schemas());
+    // Operator inbox triage
+    schemas.extend(crate::openhuman::operator_inbox::all_operator_inbox_controller_schemas());
+    // Chat-with-data analytics
+    schemas.extend(crate::openhuman::chat_with_data::all_chat_with_data_controller_schemas());
     // Durable agent session database
     schemas.extend(crate::openhuman::session_db::all_session_db_controller_schemas());
     // Background agent command center
@@ -616,6 +643,24 @@ pub fn namespace_description(namespace: &str) -> Option<&'static str> {
         ),
         "companion" => Some(
             "Desktop companion — Clicky-style hotkey-driven interaction loop with STT, LLM, TTS, and visual pointing.",
+        ),
+        "voice_assistant" => Some(
+            "Standalone local-first voice assistant — mic → VAD → STT → LLM → TTS → speaker loop with session management.",
+        ),
+        "guided_flows" => Some(
+            "Reusable guided recommendation and intake flows — quiz-style state machine with branching, validation, and recommendation generation.",
+        ),
+        "live_captions" => Some(
+            "Real-time captioning, transcript persistence, and meeting-note summarization from microphone or system audio.",
+        ),
+        "voice_actions" => Some(
+            "Voice-driven desktop actions — maps utterances to controller-backed commands with safety levels and confirmation flows.",
+        ),
+        "operator_inbox" => Some(
+            "Operator inbox assistant — message triage, priority scoring, draft reply generation, and follow-up scheduling.",
+        ),
+        "chat_with_data" => Some(
+            "Chat-with-data analytics — natural-language querying over datasets with proactive insight and anomaly detection.",
         ),
         "tinyplace" => Some(
             "tiny.place A2A social-network integration: directory, explorer, and search over the agent network.",
