@@ -34,6 +34,29 @@ impl Tool for EchoTool {
     }
 }
 
+struct NamedTool {
+    name: &'static str,
+}
+
+#[async_trait]
+impl Tool for NamedTool {
+    fn name(&self) -> &str {
+        self.name
+    }
+
+    fn description(&self) -> &str {
+        "test named tool"
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({"type": "object", "properties": {}})
+    }
+
+    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        Ok(ToolResult::success("ok"))
+    }
+}
+
 /// Mock provider: first call requests the echo tool, second call answers.
 struct EchoThenDone {
     calls: AtomicUsize,
@@ -101,6 +124,126 @@ async fn turn_runs_through_the_tinyagents_harness_with_real_tools() {
             .any(|m| m.content.contains("echoed:hi")),
         "tool result should be threaded into the transcript: {:?}",
         outcome.history
+    );
+}
+
+struct UnknownThenDone {
+    calls: AtomicUsize,
+    request_tool_names: std::sync::Mutex<Vec<Vec<String>>>,
+    request_messages: std::sync::Mutex<Vec<Vec<ChatMessage>>>,
+}
+
+#[async_trait]
+impl Provider for UnknownThenDone {
+    async fn chat_with_system(
+        &self,
+        _s: Option<&str>,
+        _m: &str,
+        _model: &str,
+        _t: f64,
+    ) -> anyhow::Result<String> {
+        Ok(String::new())
+    }
+
+    async fn chat(
+        &self,
+        request: ChatRequest<'_>,
+        _model: &str,
+        _temperature: f64,
+    ) -> anyhow::Result<ChatResponse> {
+        let tool_names = request
+            .tools
+            .unwrap_or(&[])
+            .iter()
+            .map(|tool| tool.name.clone())
+            .collect::<Vec<_>>();
+        self.request_tool_names.lock().unwrap().push(tool_names);
+        self.request_messages
+            .lock()
+            .unwrap()
+            .push(request.messages.to_vec());
+
+        let call = self.calls.fetch_add(1, Ordering::SeqCst);
+        if call == 0 {
+            Ok(ChatResponse {
+                tool_calls: vec![ToolCall {
+                    id: "unknown-1".to_string(),
+                    name: "missing_tool".to_string(),
+                    arguments: "{}".to_string(),
+                    extra_content: None,
+                }],
+                ..Default::default()
+            })
+        } else {
+            Ok(ChatResponse {
+                text: Some("recovered".to_string()),
+                ..Default::default()
+            })
+        }
+    }
+
+    fn supports_native_tools(&self) -> bool {
+        true
+    }
+}
+
+#[tokio::test]
+async fn unknown_tool_hint_uses_the_policy_filtered_available_set() {
+    let provider = Arc::new(UnknownThenDone {
+        calls: AtomicUsize::new(0),
+        request_tool_names: std::sync::Mutex::new(Vec::new()),
+        request_messages: std::sync::Mutex::new(Vec::new()),
+    });
+    let tools: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![
+        Box::new(NamedTool { name: "read_notes" }),
+        Box::new(NamedTool {
+            name: "write_notes",
+        }),
+    ]);
+    let allowed = std::collections::HashSet::from(["read_notes".to_string()]);
+
+    let outcome = run_turn_via_tinyagents_shared(
+        provider.clone(),
+        "mock-model",
+        0.0,
+        vec![ChatMessage::user("use a missing tool")],
+        vec![tools],
+        allowed,
+        4,
+        None,
+        None,
+        None,
+        None,
+        &[],
+        false,
+        None,
+        TurnContextMiddleware::defaults(),
+        None,
+    )
+    .await
+    .expect("unknown tool recovery should continue the turn");
+
+    assert_eq!(outcome.text, "recovered");
+    let request_tool_names = provider.request_tool_names.lock().unwrap();
+    assert!(request_tool_names[0].contains(&"read_notes".to_string()));
+    assert!(
+        !request_tool_names[0].contains(&"write_notes".to_string()),
+        "provider-visible tool schema must use the filtered allowlist: {:?}",
+        request_tool_names[0]
+    );
+
+    let messages = provider.request_messages.lock().unwrap();
+    let joined = messages
+        .iter()
+        .flatten()
+        .map(|message| message.content.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(joined.contains("Unknown tool: missing_tool"));
+    assert!(joined.contains("Available tools: read_notes"));
+    assert!(
+        !joined.contains("write_notes"),
+        "unknown-tool hint must not advertise policy-filtered tools: {joined}"
     );
 }
 

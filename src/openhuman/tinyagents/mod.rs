@@ -72,6 +72,12 @@ pub struct ToolPolicyEnforcement {
     pub session_id: String,
     pub channel: String,
     pub agent_definition_id: String,
+    /// True when the agent definition/session explicitly scoped the visible tool
+    /// set. Keep this separate from the policy-filtered callable set: a readonly
+    /// channel can make `allowed` non-empty even though there was no agent-scope
+    /// filter, and genuinely unknown tools should still get the generic unknown
+    /// recovery wording in that case.
+    pub visibility_filter_active: bool,
 }
 
 /// Drain the run queue's pending steer messages and forward them to the
@@ -356,6 +362,15 @@ pub async fn run_turn_via_tinyagents_shared(
         names.insert(UNKNOWN_TOOL_SENTINEL.to_string());
         Arc::new(names)
     };
+    let available_tool_names: Vec<String> = {
+        let mut names = valid_tools
+            .iter()
+            .filter(|name| name.as_str() != UNKNOWN_TOOL_SENTINEL)
+            .cloned()
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    };
 
     let cursor: IterationCursor = Arc::default();
     // Keep a provider handle for the context-window summarizer (the run consumes
@@ -507,7 +522,10 @@ pub async fn run_turn_via_tinyagents_shared(
     // The unknown-tool sentinel: the model adapter rewrites any unadvertised tool
     // call onto it so the run recovers gracefully instead of aborting. Its wording
     // matches the legacy engine (sub-agent vs top-level).
-    harness.register_tool(Arc::new(UnknownToolAdapter::new(subagent_scope.is_some())));
+    harness.register_tool(Arc::new(UnknownToolAdapter::new(
+        subagent_scope.is_some(),
+        available_tool_names,
+    )));
     let tool_count = registered.len();
 
     // Human-in-the-loop approval as a named tool middleware (issue #4249,
@@ -545,6 +563,7 @@ pub async fn run_turn_via_tinyagents_shared(
             enforcement.session,
             tool_sets.clone(),
             allowed.clone(),
+            enforcement.visibility_filter_active,
             enforcement.session_id,
             enforcement.channel,
             enforcement.agent_definition_id,

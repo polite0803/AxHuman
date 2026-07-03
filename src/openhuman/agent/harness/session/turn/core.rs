@@ -928,7 +928,11 @@ impl Agent {
                     temperature,
                     messages,
                     tools: self.tools.clone(),
-                    visible_tool_names: self.visible_tool_names.clone(),
+                    visible_tool_names: self
+                        .visible_tool_specs
+                        .iter()
+                        .map(|spec| spec.name.clone())
+                        .collect(),
                     max_iterations,
                     on_progress: self.on_progress.clone(),
                     context_window,
@@ -942,6 +946,7 @@ impl Agent {
                         session_id: self.event_session_id.clone(),
                         channel: self.event_channel().to_string(),
                         agent_definition_id: self.agent_definition_id.clone(),
+                        visibility_filter_active: !self.visible_tool_names.is_empty(),
                     }),
                 }),
             )

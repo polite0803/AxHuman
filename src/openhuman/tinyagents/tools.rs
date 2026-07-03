@@ -33,11 +33,23 @@ pub const UNKNOWN_TOOL_SENTINEL: &str = "__openhuman_unknown_tool__";
 /// "Unknown tool" message (`engine::tools`). Tests and the model key off these.
 pub struct UnknownToolAdapter {
     subagent: bool,
+    available_tool_names: Arc<Vec<String>>,
 }
 
 impl UnknownToolAdapter {
-    pub fn new(subagent: bool) -> Self {
-        Self { subagent }
+    pub fn new(subagent: bool, available_tool_names: Vec<String>) -> Self {
+        Self {
+            subagent,
+            available_tool_names: Arc::new(available_tool_names),
+        }
+    }
+}
+
+pub(crate) fn format_available_tools_hint(available_tool_names: &[String]) -> String {
+    if available_tool_names.is_empty() {
+        "No tools are currently available.".to_string()
+    } else {
+        format!("Available tools: {}", available_tool_names.join(", "))
     }
 }
 
@@ -65,14 +77,15 @@ impl Tool<()> for UnknownToolAdapter {
             .get("requested_tool")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
+        let available_hint = format_available_tools_hint(&self.available_tool_names);
         let content = if self.subagent {
             format!(
-                "Error: tool '{requested}' is not available to this sub-agent. \
+                "Error: tool '{requested}' is not available to this sub-agent. {available_hint} \
                  Use one of your listed tools, or answer directly."
             )
         } else {
             format!(
-                "Unknown tool: {requested}. It is not available; do not call it again. \
+                "Unknown tool: {requested}. {available_hint} It is not available; do not call it again. \
                  Use one of the advertised tools, or answer directly."
             )
         };

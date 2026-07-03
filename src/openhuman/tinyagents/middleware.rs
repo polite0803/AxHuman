@@ -36,7 +36,7 @@ use tinyagents::harness::runtime::AgentHarness;
 use tinyagents::harness::steering::{SteeringCommand, SteeringHandle};
 use tinyagents::harness::tool::{ToolCall as TaToolCall, ToolResult as TaToolResult};
 
-use super::tools::UNKNOWN_TOOL_SENTINEL;
+use super::tools::{format_available_tools_hint, UNKNOWN_TOOL_SENTINEL};
 use crate::openhuman::agent::harness::payload_summarizer::PayloadSummarizer;
 use crate::openhuman::approval::{
     redact_args, summarize_action, ApprovalGate, ExecutionOutcome, GateOutcome,
@@ -423,6 +423,18 @@ impl ToolOutputMiddleware {
             .find(|t| t.name() == name)
             .and_then(|t| t.max_result_size_chars())
     }
+
+    fn is_recovery_guidance(result: &TaToolResult) -> bool {
+        if result.error.is_none() {
+            return false;
+        }
+        let content = result.content.as_str();
+        content.starts_with("Unknown tool: ")
+            || (content.starts_with("Tool '")
+                && content.contains(" is not available to this agent"))
+            || (content.starts_with("Error: tool '")
+                && content.contains(" is not available to this sub-agent"))
+    }
 }
 
 #[async_trait]
@@ -481,7 +493,7 @@ impl Middleware<()> for ToolOutputMiddleware {
         // 3. Shared byte-cap backstop — truncate at a UTF-8 boundary with a marker.
         //    Only for tools with no cap of their own (a capped tool already bounded
         //    itself above; stacking the two markers would double-truncate).
-        if tool_cap.is_none() && self.budget_bytes > 0 {
+        if tool_cap.is_none() && self.budget_bytes > 0 && !Self::is_recovery_guidance(result) {
             let (capped, outcome) =
                 apply_tool_result_budget(std::mem::take(&mut result.content), self.budget_bytes);
             if outcome.truncated {
@@ -674,11 +686,13 @@ pub struct ToolPolicyMiddleware {
     /// `Tool` can be resolved for its generated-tool runtime context and its
     /// per-call permission level.
     tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
-    /// The advertised (visible) tool-name whitelist. Non-empty = restricted; a
-    /// call outside it is "not available to this agent" (the engine's first gate).
-    /// A non-visible tool is never registered, so it reaches here rewritten onto
-    /// the recovery sentinel — its original name rides `requested_tool`.
+    /// The advertised/callable tool-name whitelist for this run.
     visible_tool_names: HashSet<String>,
+    /// Whether the user/agent explicitly scoped the visible tool set. Keep this
+    /// separate from `visible_tool_names`: channel policy can narrow callable
+    /// names even when no explicit visibility filter was configured, and those
+    /// unknown calls should still reach the generic unknown-tool sentinel.
+    visibility_filter_active: bool,
     session_id: String,
     channel: String,
     agent_definition_id: String,
@@ -690,6 +704,7 @@ impl ToolPolicyMiddleware {
         session: crate::openhuman::agent_tool_policy::ToolPolicySession,
         tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
         visible_tool_names: HashSet<String>,
+        visibility_filter_active: bool,
         session_id: String,
         channel: String,
         agent_definition_id: String,
@@ -699,6 +714,7 @@ impl ToolPolicyMiddleware {
             session,
             tool_sets,
             visible_tool_names,
+            visibility_filter_active,
             session_id,
             channel,
             agent_definition_id,
@@ -749,6 +765,12 @@ impl ToolPolicyMiddleware {
             .find(|t| t.name() == name)
             .and_then(|t| t.generated_runtime_context(args))
     }
+
+    fn available_tools_hint(&self) -> String {
+        let mut names = self.visible_tool_names.iter().cloned().collect::<Vec<_>>();
+        names.sort();
+        format_available_tools_hint(&names)
+    }
 }
 
 #[async_trait]
@@ -777,14 +799,17 @@ impl ToolMiddleware<()> for ToolPolicyMiddleware {
         // unknown call with no visibility restriction still falls through to the
         // sentinel's "Unknown tool" result.
         if call.name == UNKNOWN_TOOL_SENTINEL {
-            if !self.visible_tool_names.is_empty() {
+            if self.visibility_filter_active {
                 let requested = call
                     .arguments
                     .get("requested_tool")
                     .and_then(|v| v.as_str())
                     .unwrap_or_default();
                 if !requested.is_empty() && !self.visible_tool_names.contains(requested) {
-                    let content = format!("Tool '{requested}' is not available to this agent");
+                    let content = format!(
+                        "Tool '{requested}' is not available to this agent. {} Use one of the advertised tools, or answer directly.",
+                        self.available_tools_hint()
+                    );
                     return Ok(MiddlewareToolOutcome::Result(TaToolResult {
                         call_id: call.id,
                         name: call.name,
@@ -1479,6 +1504,24 @@ mod tests {
             "a truncation marker should be appended: {}",
             result.content
         );
+    }
+
+    #[tokio::test]
+    async fn tool_output_preserves_unknown_tool_guidance_under_small_budget() {
+        let mw = ToolOutputMiddleware {
+            budget_bytes: 96,
+            payload_summarizer: None,
+            tool_sets: vec![],
+        };
+        let content = "Unknown tool: hidden_tool. Available tools: cli_only, round17_boom, round17_error, round17_ok. Use one of the advertised tools, or answer directly.";
+        let mut result = tool_result(UNKNOWN_TOOL_SENTINEL, content);
+        result.error = Some(content.to_string());
+
+        mw.after_tool(&mut ctx(), &(), &mut result).await.unwrap();
+
+        assert!(result.content.contains("hidden_tool"));
+        assert!(result.content.contains("Available tools: cli_only"));
+        assert!(!result.content.contains("truncated by tool_result_budget"));
     }
 
     #[tokio::test]
