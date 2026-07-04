@@ -62,6 +62,7 @@ use crate::openhuman::config::Config;
 
 /// Langfuse ingestion exporter (remote push to the co-hosted staging server).
 pub(crate) mod langfuse;
+pub mod rpc;
 
 /// Kind of run a trace belongs to, rendered as stable snake_case strings for
 /// Langfuse trace tags (`run:<type>`) and metadata (`run_type`) so runs can be
