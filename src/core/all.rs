@@ -131,7 +131,6 @@ fn build_registered_controllers() -> Vec<RegisteredController> {
     controllers.extend(crate::openhuman::webview_apis::all_webview_apis_registered_controllers());
     // Agent definition and prompt inspection
     controllers.extend(crate::openhuman::agent::all_agent_registered_controllers());
-    controllers.extend(crate::openhuman::agent::progress_tracing::rpc::all_progress_tracing_registered_controllers());
     // Read-only agent run replay + status over the durable journal/status seams
     // (agent_run_events / agent_run_status / agent_runs_active).
     controllers
@@ -366,6 +365,10 @@ fn build_internal_only_controllers() -> Vec<RegisteredController> {
     // sessions/messages, sends Master steering DMs, marks read, and polls status.
     // Renderer-only — not advertised to agents.
     controllers.extend(crate::openhuman::orchestration::all_registered_controllers());
+    // observability_submit_score: score feedback from the UI (renderer-only).
+    // Excluded from agent-facing catalog — agents must NOT be able to
+    // fabricate Langfuse scores.
+    controllers.extend(crate::openhuman::agent::progress_tracing::rpc::all_progress_tracing_registered_controllers());
     controllers
 }
 
