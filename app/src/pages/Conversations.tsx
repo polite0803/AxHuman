@@ -1,6 +1,7 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
 import debugFactory from 'debug';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LuThumbsDown, LuThumbsUp } from 'react-icons/lu';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { type ChatSendError, chatSendError } from '../chat/chatSendError';
@@ -107,7 +108,6 @@ import {
   BubbleMarkdown,
 } from './conversations/components/AgentMessageBubble';
 import { AgentProcessSourcePanel } from './conversations/components/AgentProcessSourcePanel';
-import { LuThumbsUp, LuThumbsDown } from 'react-icons/lu';
 import {
   BackgroundProcessesPanel,
   selectBackgroundProcesses,
@@ -2232,8 +2232,10 @@ const Conversations = ({
                                           <button
                                             type="button"
                                             className="rounded-full bg-white p-1 text-stone-500 shadow-sm ring-1 ring-inset ring-stone-200 hover:bg-stone-50 hover:text-stone-700 dark:bg-stone-800 dark:text-stone-400 dark:ring-stone-700 dark:hover:bg-stone-700 dark:hover:text-stone-200"
-                                              onClick={() => {
-                                              const traceId = (msg.extraMetadata?.traceId as string) || `${selectedThreadId}:${msg.id}`;
+                                            onClick={() => {
+                                              const traceId =
+                                                (msg.extraMetadata?.traceId as string) ||
+                                                `${selectedThreadId}:${msg.id}`;
                                               void callCoreRpc({
                                                 method: 'openhuman.observability_submit_score',
                                                 params: {
@@ -2242,19 +2244,22 @@ const Conversations = ({
                                                   value: 1.0,
                                                 },
                                               }).catch(() => {
-                                                console.warn('[feedback] failed to submit good-response score');
+                                                console.warn(
+                                                  '[feedback] failed to submit good-response score'
+                                                );
                                               });
                                             }}
                                             title={t('chat.feedback.goodResponse')}
-                                            aria-label={t('chat.feedback.goodResponse')}
-                                          >
+                                            aria-label={t('chat.feedback.goodResponse')}>
                                             <LuThumbsUp className="h-3 w-3" />
                                           </button>
                                           <button
                                             type="button"
                                             className="rounded-full bg-white p-1 text-stone-500 shadow-sm ring-1 ring-inset ring-stone-200 hover:bg-stone-50 hover:text-stone-700 dark:bg-stone-800 dark:text-stone-400 dark:ring-stone-700 dark:hover:bg-stone-700 dark:hover:text-stone-200"
-                                              onClick={() => {
-                                              const traceId = (msg.extraMetadata?.traceId as string) || `${selectedThreadId}:${msg.id}`;
+                                            onClick={() => {
+                                              const traceId =
+                                                (msg.extraMetadata?.traceId as string) ||
+                                                `${selectedThreadId}:${msg.id}`;
                                               void callCoreRpc({
                                                 method: 'openhuman.observability_submit_score',
                                                 params: {
@@ -2263,12 +2268,13 @@ const Conversations = ({
                                                   value: 0.0,
                                                 },
                                               }).catch(() => {
-                                                console.warn('[feedback] failed to submit bad-response score');
+                                                console.warn(
+                                                  '[feedback] failed to submit bad-response score'
+                                                );
                                               });
                                             }}
                                             title={t('chat.feedback.badResponse')}
-                                            aria-label={t('chat.feedback.badResponse')}
-                                          >
+                                            aria-label={t('chat.feedback.badResponse')}>
                                             <LuThumbsDown className="h-3 w-3" />
                                           </button>
                                         </>
