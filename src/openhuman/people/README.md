@@ -22,7 +22,7 @@ Contact resolution + relationship scoring (the "A5" module). Maps any of three h
 | `src/openhuman/people/scorer.rs` | Pure `score(interactions, now) -> ScoreComponents`. Recency half-life, frequency window/cap, reciprocity balance, depth cap as module constants. |
 | `src/openhuman/people/store.rs` | SQLite-backed `PeopleStore` (`Arc<Mutex<Connection>>`) + rebindable process-global accessor (`init_from_workspace` / `get`). CRUD, lookup, interaction read/write, batched interaction fetch. |
 | `src/openhuman/people/address_book.rs` | `ContactsSource` trait + `SystemContactsSource` (macOS `CNContactStore` FFI via objc2) and non-mac stub; `MockContactsSource` for tests; `AddressBookError`. |
-| `src/openhuman/people/rpc.rs` | Domain RPC handlers (`handle_list`, `handle_resolve`, `handle_score`, `handle_refresh_address_book`) returning `RpcOutcome<Value>`; callable directly in tests with a constructed `PeopleStore`. |
+| `src/openhuman/people/rpc.rs` | Domain RPC handlers (`handle_list`, `handle_drifting`, `handle_resolve`, `handle_score`, `handle_refresh_address_book`) returning `RpcOutcome<Value>`; callable directly in tests with a constructed `PeopleStore`. |
 | `src/openhuman/people/schemas.rs` | Controller schemas + param-parsing adapter handlers that fetch the global store and delegate to `rpc.rs`. |
 | `src/openhuman/people/migrations.rs` | Idempotent migration runner (bookkeeping table `_people_migrations`, per-migration transaction). |
 | `src/openhuman/people/migrations/0001_init.sql` | Schema: `people`, `handle_aliases`, `interactions` + indexes. |

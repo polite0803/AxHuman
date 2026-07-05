@@ -2,6 +2,7 @@
 //!
 //! Controllers exposed:
 //!   - `people.list`                  — ranked list of known people + component scores
+//!   - `people.drifting`              — contacts gone quiet past a staleness threshold
 //!   - `people.resolve`               — map a handle to a `PersonId`, optionally minting
 //!   - `people.score`                 — component-broken-down score for one person
 //!   - `people.refresh_address_book`  — seed the store from the system address book
@@ -17,6 +18,7 @@ use crate::rpc::RpcOutcome;
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
     vec![
         schemas("list"),
+        schemas("drifting"),
         schemas("resolve"),
         schemas("score"),
         schemas("refresh_address_book"),
@@ -28,6 +30,10 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
         RegisteredController {
             schema: schemas("list"),
             handler: handle_list,
+        },
+        RegisteredController {
+            schema: schemas("drifting"),
+            handler: handle_drifting,
         },
         RegisteredController {
             schema: schemas("resolve"),
@@ -114,6 +120,75 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 comment: "Ranked people, highest score first.",
                 required: true,
             }],
+        },
+        "drifting" => ControllerSchema {
+            namespace: "people",
+            function: "drifting",
+            description: "Contacts whose most recent interaction is older than `days` days — a \
+                 \"relationships going cold\" surface. Contacts never interacted with are \
+                 excluded (nothing to drift from). Oldest last-touch first.",
+            inputs: vec![
+                FieldSchema {
+                    name: "days",
+                    ty: TypeSchema::U64,
+                    comment: "Staleness threshold in days; a contact appears once its most \
+                         recent interaction is older than this. Defaults to 30.",
+                    required: false,
+                },
+                FieldSchema {
+                    name: "limit",
+                    ty: TypeSchema::U64,
+                    comment: "Maximum rows to return. Defaults to 100, capped at 500.",
+                    required: false,
+                },
+            ],
+            outputs: vec![
+                FieldSchema {
+                    name: "contacts",
+                    ty: TypeSchema::Array(Box::new(TypeSchema::Object {
+                        fields: vec![
+                            FieldSchema {
+                                name: "person_id",
+                                ty: TypeSchema::String,
+                                comment: "Stable UUID for this person.",
+                                required: true,
+                            },
+                            FieldSchema {
+                                name: "display_name",
+                                ty: TypeSchema::Option(Box::new(TypeSchema::String)),
+                                comment: "Best-known display name, when set.",
+                                required: false,
+                            },
+                            FieldSchema {
+                                name: "primary_email",
+                                ty: TypeSchema::Option(Box::new(TypeSchema::String)),
+                                comment: "Primary email, when set.",
+                                required: false,
+                            },
+                            FieldSchema {
+                                name: "last_interaction_at",
+                                ty: TypeSchema::I64,
+                                comment: "Unix seconds of the most recent interaction.",
+                                required: true,
+                            },
+                            FieldSchema {
+                                name: "days_since_last",
+                                ty: TypeSchema::I64,
+                                comment: "Whole days since that interaction.",
+                                required: true,
+                            },
+                        ],
+                    })),
+                    comment: "Drifting contacts, oldest last-touch first.",
+                    required: true,
+                },
+                FieldSchema {
+                    name: "threshold_days",
+                    ty: TypeSchema::U64,
+                    comment: "Echo of the applied staleness threshold.",
+                    required: true,
+                },
+            ],
         },
         "resolve" => ControllerSchema {
             namespace: "people",
@@ -303,6 +378,15 @@ fn handle_list(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
+fn handle_drifting(params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
+        let store = store::get().map_err(|e| e.to_string())?;
+        let days = read_optional_u64(&params, "days")?.unwrap_or(30);
+        let limit = read_optional_u64(&params, "limit")?.unwrap_or(100) as usize;
+        to_json(rpc::handle_drifting(&store, days, limit).await?)
+    })
+}
+
 fn handle_resolve(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let store = store::get().map_err(|e| e.to_string())?;
@@ -390,15 +474,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn all_controller_schemas_lists_four_functions() {
+    fn all_controller_schemas_lists_five_functions() {
         let names: Vec<_> = all_controller_schemas()
             .into_iter()
             .map(|s| s.function)
             .collect();
         assert_eq!(
             names,
-            vec!["list", "resolve", "score", "refresh_address_book"]
+            vec![
+                "list",
+                "drifting",
+                "resolve",
+                "score",
+                "refresh_address_book"
+            ]
         );
+    }
+
+    #[test]
+    fn drifting_schema_inputs_are_optional() {
+        let s = schemas("drifting");
+        assert_eq!(s.function, "drifting");
+        assert!(
+            s.inputs.iter().all(|f| !f.required),
+            "days and limit both default"
+        );
+        let out_names: Vec<_> = s.outputs.iter().map(|f| f.name).collect();
+        assert_eq!(out_names, vec!["contacts", "threshold_days"]);
     }
 
     #[test]
@@ -422,7 +524,7 @@ mod tests {
     #[test]
     fn registered_controllers_have_handler_per_schema() {
         let regs = all_registered_controllers();
-        assert_eq!(regs.len(), 4);
+        assert_eq!(regs.len(), 5);
     }
 
     #[test]
