@@ -394,9 +394,6 @@ fn build_declared_controller_schemas() -> Vec<ControllerSchema> {
     schemas.extend(crate::openhuman::mcp_registry::all_mcp_registry_controller_schemas());
     schemas.extend(crate::openhuman::webview_apis::all_webview_apis_controller_schemas());
     schemas.extend(crate::openhuman::agent::all_agent_controller_schemas());
-    schemas.extend(
-        crate::openhuman::agent::progress_tracing::rpc::all_progress_tracing_controller_schemas(),
-    );
     // Read-only agent run replay + status controllers (workstream 05.x).
     schemas.extend(crate::openhuman::tinyagents::replay::all_agent_replay_controller_schemas());
     schemas.extend(crate::openhuman::profiles::all_profiles_controller_schemas());
