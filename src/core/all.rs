@@ -365,6 +365,13 @@ fn build_internal_only_controllers() -> Vec<RegisteredController> {
     // sessions/messages, sends Master steering DMs, marks read, and polls status.
     // Renderer-only — not advertised to agents.
     controllers.extend(crate::openhuman::orchestration::all_registered_controllers());
+    // observability_submit_score: score feedback from the UI (renderer-only).
+    // Excluded from agent-facing catalog — agents must NOT be able to
+    // fabricate Langfuse scores.
+    controllers.extend(
+        crate::openhuman::agent::progress_tracing::rpc::all_progress_tracing_registered_controllers(
+        ),
+    );
     controllers
 }
 
@@ -684,6 +691,9 @@ pub fn namespace_description(namespace: &str) -> Option<&'static str> {
         ),
         "tinyplace" => Some(
             "tiny.place A2A social-network integration: directory, explorer, and search over the agent network.",
+        ),
+        "observability" => Some(
+            "Submit observability feedback such as quality scores to the active trace.",
         ),
         _ => None,
     }

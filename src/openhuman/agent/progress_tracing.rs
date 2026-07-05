@@ -62,6 +62,7 @@ use crate::openhuman::config::Config;
 
 /// Langfuse ingestion exporter (remote push to the co-hosted staging server).
 pub(crate) mod langfuse;
+pub mod rpc;
 
 /// Kind of run a trace belongs to, rendered as stable snake_case strings for
 /// Langfuse trace tags (`run:<type>`) and metadata (`run_type`) so runs can be
@@ -143,6 +144,13 @@ pub struct TraceContext {
     /// Kind of run — exported as Langfuse trace tags (`run:<type>`) and the
     /// `run_type` metadata key. Defaults to interactive chat.
     pub run_type: RunType,
+}
+
+tokio::task_local! {
+    /// Trace ID of the currently executing turn, set by the web-chat runner
+    /// so tool implementations can stamp the Langfuse trace ID onto message
+    /// extra_metadata for feedback-score correlation.
+    pub(crate) static TURN_TRACE_ID: String;
 }
 
 impl TraceContext {
