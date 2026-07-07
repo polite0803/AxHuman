@@ -7022,6 +7022,13 @@ const messages: TranslationMap = {
   'flows.delete.confirm': 'Usuń',
   'flows.delete.deleting': 'Usuwanie…',
   'flows.canvas.renameLabel': 'Zmień nazwę przepływu pracy',
+
+  // Emergency stop (#4255)
+  'safety.emergencyStop': 'Awaryjne zatrzymanie',
+  'safety.stopFailed': 'Nie udało się zatrzymać automatyzacji — spróbuj ponownie.',
+  'safety.resume': 'Wznów automatyzację',
+  'safety.haltedTitle': 'Automatyzacja wstrzymana',
+  'safety.haltedBody': 'Cała automatyzacja pulpitu jest zatrzymana. Wznów, gdy będziesz gotowy.',
 };
 
 export default messages;

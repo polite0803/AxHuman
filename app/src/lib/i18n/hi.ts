@@ -6921,6 +6921,13 @@ const messages: TranslationMap = {
   'flows.delete.confirm': 'हटाएं',
   'flows.delete.deleting': 'हटाया जा रहा है…',
   'flows.canvas.renameLabel': 'वर्कफ़्लो का नाम बदलें',
+
+  // Emergency stop (#4255)
+  'safety.emergencyStop': 'आपातकालीन रोक',
+  'safety.stopFailed': 'स्वचालन रोका नहीं जा सका — पुनः प्रयास करें।',
+  'safety.resume': 'स्वचालन पुनः प्रारंभ करें',
+  'safety.haltedTitle': 'स्वचालन रोका गया',
+  'safety.haltedBody': 'सभी डेस्कटॉप स्वचालन रोक दिया गया है। तैयार होने पर पुनः प्रारंभ करें।',
 };
 
 export default messages;

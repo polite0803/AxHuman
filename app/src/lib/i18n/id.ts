@@ -6947,6 +6947,13 @@ const messages: TranslationMap = {
   'flows.delete.confirm': 'Hapus',
   'flows.delete.deleting': 'Menghapus…',
   'flows.canvas.renameLabel': 'Ganti nama alur kerja',
+
+  // Emergency stop (#4255)
+  'safety.emergencyStop': 'Hentikan darurat',
+  'safety.stopFailed': 'Tidak dapat menghentikan otomasi — coba lagi.',
+  'safety.resume': 'Lanjutkan otomasi',
+  'safety.haltedTitle': 'Otomasi dihentikan',
+  'safety.haltedBody': 'Semua otomasi desktop dihentikan. Lanjutkan ketika Anda siap.',
 };
 
 export default messages;

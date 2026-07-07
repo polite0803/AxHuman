@@ -6997,6 +6997,14 @@ const messages: TranslationMap = {
   'flows.delete.confirm': 'Удалить',
   'flows.delete.deleting': 'Удаление…',
   'flows.canvas.renameLabel': 'Переименовать рабочий процесс',
+
+  // Emergency stop (#4255)
+  'safety.emergencyStop': 'Аварийная остановка',
+  'safety.stopFailed': 'Не удалось остановить автоматизацию — попробуйте ещё раз.',
+  'safety.resume': 'Возобновить автоматизацию',
+  'safety.haltedTitle': 'Автоматизация приостановлена',
+  'safety.haltedBody':
+    'Вся автоматизация рабочего стола остановлена. Возобновите, когда будете готовы.',
 };
 
 export default messages;

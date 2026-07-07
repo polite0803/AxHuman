@@ -6769,6 +6769,13 @@ const messages: TranslationMap = {
   'flows.delete.confirm': 'حذف',
   'flows.delete.deleting': 'جارٍ الحذف…',
   'flows.canvas.renameLabel': 'إعادة تسمية سير العمل',
+
+  // Emergency stop (#4255)
+  'safety.emergencyStop': 'إيقاف الطوارئ',
+  'safety.stopFailed': 'تعذّر إيقاف الأتمتة — أعد المحاولة.',
+  'safety.resume': 'استئناف الأتمتة',
+  'safety.haltedTitle': 'الأتمتة متوقفة',
+  'safety.haltedBody': 'تم إيقاف جميع أتمتة سطح المكتب. استأنف عندما تكون مستعدًا.',
 };
 
 export default messages;

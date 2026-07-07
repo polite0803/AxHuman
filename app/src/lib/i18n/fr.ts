@@ -7083,6 +7083,14 @@ const messages: TranslationMap = {
   'flows.delete.confirm': 'Supprimer',
   'flows.delete.deleting': 'Suppression…',
   'flows.canvas.renameLabel': 'Renommer le workflow',
+
+  // Emergency stop (#4255)
+  'safety.emergencyStop': "Arrêt d'urgence",
+  'safety.stopFailed': "Impossible d'arrêter l'automatisation — réessayez.",
+  'safety.resume': "Reprendre l'automatisation",
+  'safety.haltedTitle': 'Automatisation suspendue',
+  'safety.haltedBody':
+    "Toute l'automatisation du bureau est arrêtée. Reprenez quand vous êtes prêt.",
 };
 
 export default messages;
