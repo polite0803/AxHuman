@@ -51,6 +51,17 @@ export interface WorkflowBuilderSendParams {
   request: BuilderTurnRequest;
 }
 
+/**
+ * Outcome of a {@link UseWorkflowBuilderChat.send} call:
+ * - `dispatched` — the turn actually ran (thread created + `flows_build` sent).
+ * - `skipped` — a retryable no-op: the socket wasn't connected, or a turn was
+ *   already in flight. Nothing was sent; a caller may retry later.
+ * - `failed` — the dispatch was attempted but threw (thread create / RPC
+ *   error). The error is surfaced via `error`; a caller must NOT auto-retry, or
+ *   it would resend and duplicate the turn.
+ */
+export type WorkflowBuilderSendOutcome = 'dispatched' | 'skipped' | 'failed';
+
 export interface UseWorkflowBuilderChat {
   /** The dedicated thread id, or `null` before the first send creates it. */
   threadId: string | null;
@@ -79,8 +90,14 @@ export interface UseWorkflowBuilderChat {
   liveResponse: string;
   /** Last send error (thread create / RPC failure), or `null`. */
   error: string | null;
-  /** Send a builder turn, creating the dedicated thread on first use. */
-  send: (params: WorkflowBuilderSendParams) => Promise<void>;
+  /**
+   * Send a builder turn, creating the dedicated thread on first use. Resolves
+   * to a {@link WorkflowBuilderSendOutcome} so callers can tell a retryable
+   * no-op (`skipped`) apart from a real dispatch (`dispatched`) or an error
+   * (`failed`) — a seeded auto-send retries only on `skipped`, never on
+   * `failed`, so a dispatch error can't loop into duplicate turns.
+   */
+  send: (params: WorkflowBuilderSendParams) => Promise<WorkflowBuilderSendOutcome>;
   /** Clear the current proposal (e.g. after Accept/Reject) without persisting. */
   clearProposal: () => void;
 }
@@ -141,12 +158,12 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
     async ({ displayText, request }: WorkflowBuilderSendParams) => {
       if (localSending) {
         log('send: ignored — a turn is already dispatching');
-        return;
+        return 'skipped';
       }
       if (socketStatus !== 'connected') {
         log('send: blocked — socket not connected (%s)', socketStatus);
         setError('offline');
-        return;
+        return 'skipped';
       }
       setLocalSending(true);
       setError(null);
@@ -196,10 +213,12 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
         } else if (result.error) {
           setError(result.error);
         }
+        return 'dispatched';
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         log('send: failed err=%o', err);
         setError(msg);
+        return 'failed';
       } finally {
         setLocalSending(false);
       }

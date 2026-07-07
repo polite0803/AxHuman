@@ -78,6 +78,14 @@ interface Props {
    */
   buildSeed?: { description: string } | null;
   /**
+   * Fires once the build seed has been dispatched, so the host can clear the
+   * ephemeral route seed (`location.state.copilotBuild`). The in-mount
+   * `buildSentRef` guard only protects the current mount; closing and reopening
+   * the panel remounts it and resets that ref, so without clearing the route
+   * seed a remount would re-fire the same `build` turn (issue #4597).
+   */
+  onBuildSeedConsumed?: () => void;
+  /**
    * The workflow's persisted copilot thread id (from the per-flow cache), so
    * reopening the panel resumes the same conversation instead of starting fresh.
    */
@@ -95,6 +103,7 @@ export default function WorkflowCopilotPanel({
   onClose,
   repairSeed = null,
   buildSeed = null,
+  onBuildSeedConsumed,
   seedThreadId = null,
   onThreadIdChange,
 }: Props) {
@@ -161,12 +170,30 @@ export default function WorkflowCopilotPanel({
   const buildSentRef = useRef(false);
   useEffect(() => {
     if (!buildSeed || buildSentRef.current) return;
+    // Optimistically guard re-entry while the async dispatch is in flight.
     buildSentRef.current = true;
     void send({
       displayText: buildSeed.description,
       request: flowId
         ? { mode: 'build', instruction: buildSeed.description, graph, flowId }
         : { mode: 'revise', instruction: buildSeed.description, graph, flowId },
+    }).then(outcome => {
+      if (outcome === 'dispatched') {
+        // Clear the ephemeral route seed only once the turn actually
+        // dispatched, so closing and reopening the panel (which remounts it
+        // and resets `buildSentRef`) can't re-fire the same build turn
+        // (issue #4597).
+        onBuildSeedConsumed?.();
+      } else if (outcome === 'skipped') {
+        // Retryable no-op (socket not connected yet, or a turn already in
+        // flight): keep the seed and release the guard so the effect retries
+        // once `send` changes identity on reconnect — otherwise the prompt is
+        // lost and the blank flow never auto-builds.
+        buildSentRef.current = false;
+      }
+      // `failed`: the dispatch was attempted but errored (surfaced via
+      // `error`). Leave the guard set so we don't auto-resend and duplicate the
+      // turn; the user can retry manually.
     });
     // `graph`/`flowId` are read once for the seed turn — later edits must not
     // re-fire it (guarded by the ref regardless).
