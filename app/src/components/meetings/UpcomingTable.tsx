@@ -14,6 +14,8 @@
 import debug from 'debug';
 import { useState } from 'react';
 
+import { findMascot } from '../../features/human/Mascot/manifest/manifestService';
+import { useMascotManifest } from '../../features/human/Mascot/manifest/useMascotManifest';
 import { useT } from '../../lib/i18n/I18nContext';
 import {
   joinMeetViaBackendBot,
@@ -26,7 +28,9 @@ import { useAppSelector } from '../../store/hooks';
 import {
   selectCustomPrimaryColor,
   selectCustomSecondaryColor,
+  selectDualMascotEnabled,
   selectMascotColor,
+  selectMeetingMascotVoicePair,
   selectSelectedMascotId,
 } from '../../store/mascotSlice';
 import { selectPersonaDescription, selectPersonaDisplayName } from '../../store/personaSlice';
@@ -359,6 +363,14 @@ export function UpcomingTable({
   const mascotColor = useAppSelector(selectMascotColor);
   const customPrimaryColor = useAppSelector(selectCustomPrimaryColor);
   const customSecondaryColor = useAppSelector(selectCustomSecondaryColor);
+  // Dual-mascot config (issue #4277) — see MeetComposer for the rationale;
+  // both join sites resolve the two-mascot slots the same way so a "Join now"
+  // and a manual join behave identically.
+  const dualMascotEnabled = useAppSelector(selectDualMascotEnabled);
+  const mascotVoicePair = useAppSelector(selectMeetingMascotVoicePair);
+  // Manifest drives name-addressed routing (#4277 follow-up): tag each dual slot
+  // with its display name so "Hey Toshi …" routes to that mascot.
+  const { manifest } = useMascotManifest();
 
   // Live in-call state — lets a row detect that its meeting is already joined
   // and suppress the "Join now" button. correlationId is a fresh per-join UUID
@@ -377,6 +389,43 @@ export function UpcomingTable({
     mascotColor === 'custom'
       ? { primaryColor: customPrimaryColor, secondaryColor: customSecondaryColor }
       : undefined;
+  // Two-mascot slots (issue #4277). Per-mascot colors are out of scope — both
+  // reuse `riveColors`. Gate on BOTH slot ids resolving to a concrete value:
+  // when the primary is on the default mascot with a custom colour,
+  // `resolveMeetingBotMascotId` (→ `mascotId`) is `undefined`; a blank slot-0 id
+  // would make the backend drop it and render the secondary ALONE (mismatch vs
+  // the on-camera primary), so we skip `mascots` and fall back to the single
+  // `mascotId` join instead of a broken duo.
+  const primarySlotId = mascotVoicePair.primary.mascotId ?? mascotId;
+  const secondarySlotId = mascotVoicePair.secondary?.mascotId;
+  // Slot display names for name-addressed routing — BOTH from the manifest so
+  // either mascot order works ("Hey Toshi" routes to whichever slot Toshi is
+  // in). Primary falls back to the persona/wake name only when its manifest
+  // entry is unavailable. Hoisted here (not inside handleJoin) because the
+  // `mascots` array is built at component-body scope.
+  const agentName = personaDisplayName.trim() || 'Tiny';
+  const primaryName =
+    (manifest && primarySlotId ? findMascot(manifest, primarySlotId)?.name : undefined) ??
+    agentName;
+  const secondaryName =
+    manifest && secondarySlotId ? findMascot(manifest, secondarySlotId)?.name : undefined;
+  const mascots =
+    dualMascotEnabled && mascotVoicePair.secondary && primarySlotId && secondarySlotId
+      ? [
+          {
+            mascotId: primarySlotId,
+            name: primaryName,
+            voiceId: mascotVoicePair.primary.voiceId,
+            riveColors,
+          },
+          {
+            mascotId: secondarySlotId,
+            name: secondaryName,
+            voiceId: mascotVoicePair.secondary.voiceId,
+            riveColors,
+          },
+        ]
+      : undefined;
 
   const handleJoin = async (meeting: UpcomingMeeting) => {
     if (!meeting.meet_url) return;
@@ -388,9 +437,8 @@ export function UpcomingTable({
     const anchor = replyDisplayName.trim();
     // Reply mode gates the bot behind a wake phrase so it only reacts when
     // addressed ("Hey Alex, …"), never to every caption from the anchor —
-    // mirroring MeetComposer. The bot joins as `agentName`, so the phrase must
-    // match it. Listen-only joins (no anchor) send no wake phrase.
-    const agentName = personaDisplayName.trim() || 'Tiny';
+    // mirroring MeetComposer. The bot joins as `agentName` (hoisted above), so
+    // the phrase must match it. Listen-only joins (no anchor) send no wake phrase.
     const wakePhrase = anchor ? `Hey ${agentName}` : undefined;
     // Mint a fresh correlation id per join. It becomes the call record's
     // `request_id` (recent-calls list key + per-call detail filename), so it
@@ -408,6 +456,13 @@ export function UpcomingTable({
       correlationId
     );
     setJoiningId(meeting.calendar_event_id);
+    // Name-addressing (#4277 follow-up) trace: mascot ids + names sent to the
+    // backend. Empty `name` on a slot ⇒ name addressing can't route to it.
+    log(
+      '[upcoming] join mascots=%o wakePhrase=%s',
+      mascots?.map(m => ({ mascotId: m.mascotId, name: m.name })),
+      wakePhrase
+    );
     try {
       await joinMeetViaBackendBot({
         meetUrl: meeting.meet_url,
@@ -415,6 +470,8 @@ export function UpcomingTable({
         agentName,
         systemPrompt: personaDescription || undefined,
         mascotId: mascotId || undefined,
+        // Dual-mascot slots (issue #4277); undefined for single-mascot calls.
+        mascots,
         respondToParticipant: anchor || undefined,
         wakePhrase,
         listenOnly: !anchor,
